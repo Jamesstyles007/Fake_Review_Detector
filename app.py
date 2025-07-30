@@ -15,8 +15,7 @@ import time
 
 app = Flask(__name__)
 
-# Load dataset
-#this is the new line
+
 try:
     df = pd.read_csv('dataset.csv')
     if not {'text', 'label'}.issubset(df.columns):
@@ -27,35 +26,35 @@ except FileNotFoundError:
     print("Error: dataset.csv not found.")
     exit(1)
 
-# Train model
+
 pipeline = Pipeline([
     ('tfidf', TfidfVectorizer(max_features=5000, stop_words='english')),
     ('clf', LogisticRegression())
 ])
 pipeline.fit(df['text'], df['label'])
 
-# Initialize Selenium driver
+
 def init_driver():
     chrome_options = Options()
-    chrome_options.add_argument('--headless')  # Run without browser UI
+    chrome_options.add_argument('--headless')  
     chrome_options.add_argument('--disable-gpu')
     chrome_options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     return driver
 
-# Fetch reviews with Selenium
+
 def fetch_reviews(product_link):
     driver = init_driver()
     reviews = []
     try:
         driver.get(product_link)
-        # Wait for page to load
+       
         WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.TAG_NAME, 'body')))
-        time.sleep(2)  # Extra wait for dynamic content
+        time.sleep(2) 
 
-        # Platform-specific logic (Amazon or Flipkart)
+        
         if 'amazon' in product_link.lower():
-            # Amazon: Navigate to reviews section
+           
             try:
                 see_all_reviews = WebDriverWait(driver, 5).until(
                     EC.element_to_be_clickable((By.ID, 'reviews-medley-footer'))
@@ -70,12 +69,12 @@ def fetch_reviews(product_link):
                 reviews = ['Could not fetch Amazon reviews.']
 
         elif 'flipkart' in product_link.lower():
-            # Flipkart: Navigate to reviews
+           
             try:
-                # Scroll to load reviews
+                
                 driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
                 time.sleep(2)
-                # Click "All reviews" if available
+                
                 try:
                     all_reviews = WebDriverWait(driver, 5).until(
                         EC.element_to_be_clickable((By.CLASS_NAME, '_27M2h_'))
@@ -84,7 +83,7 @@ def fetch_reviews(product_link):
                     time.sleep(2)
                 except:
                     pass
-                # Extract reviews
+            
                 review_elements = driver.find_elements(By.CSS_SELECTOR, 'div.t-ZTKy div div')
                 reviews = [elem.text.strip() for elem in review_elements if elem.text.strip()]
             except Exception as e:
@@ -94,7 +93,7 @@ def fetch_reviews(product_link):
         else:
             reviews = ['Unsupported website. Try Amazon or Flipkart.']
 
-        # Limit to 10 reviews to avoid overload
+        
         reviews = reviews[:10] if reviews else ['No reviews found.']
 
     except Exception as e:
@@ -106,30 +105,30 @@ def fetch_reviews(product_link):
 
     return reviews
 
-# Clean review text
+
 def clean_text(text):
     text = re.sub(r'[^\w\s]', '', text)
     text = text.lower().strip()
     return text
 
-# Home route
+
 @app.route('/')
 def home():
     return render_template('index.html')
 
-# Check reviews route
+
 @app.route('/check', methods=['POST'])
 def check_reviews():
     product_link = request.form['product_link']
     
-    # Fetch reviews
+ 
     reviews = fetch_reviews(product_link)
     
-    # Clean and classify
+
     cleaned_reviews = [clean_text(review) for review in reviews]
     predictions = pipeline.predict(cleaned_reviews)
     
-    # Prepare results
+
     results = []
     for review, pred in zip(reviews, predictions):
         results.append({
